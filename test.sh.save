@@ -1,0 +1,67 @@
+#!/bin/bash
+sudo apt update -y
+mkdir -p Downloads
+cd Downloads
+git clone "https://github.com/OmkarMensi/Recruitment"
+frontend="/home/ubuntu/Downloads/Recruitment/frontend"
+backend="/home/ubuntu/Downloads/Recruitment/backend"
+ENV_PATH="/home/ubuntu/Downloads/Recruitment/.env"
+set -a
+source "$ENV_PATH"
+set +a
+
+
+dbname="$MYSQL_DATABASE"
+dbuser="$MYSQL_USER"
+dbpassword="$MYSQL_PASSWORD"
+
+
+if [[ -z "$(command -v npm)" ]]; then
+	echo -e "npm doesn't exist,proceeding to install...\n"
+	sudo apt install npm -y	
+	npm -v
+else
+	echo -e "npm exists\n"
+fi
+
+cd "$frontend"
+npm install #installs dependencies
+npm run build #creates a build
+nohup npm start &
+cd ..
+cd "$backend"
+if [[ -z "$(command -v mvn)" ]]; then
+	echo -e "proceeding to install maven..\n"
+	sudo apt install maven -y
+	mvn --version
+fi
+if [[ -z "$(command -v java)" ]]; then
+	echo -e "proceeding to install openjdk..\n"
+	sudo apt install openjdk-17-jdk -y
+	java --version
+	javac --version
+fi
+if [[ -z "$(command -v mysql)" ]]; then
+	echo -e "proceeding to install mysql...\n"
+	sudo apt install mysql-server -y
+	mysql --version
+fi
+0000000
+mvn clean install -DskipTests 2>error.log
+if [[ $(grep -q "BUILD FAILURE" error.log) ]];then
+echo -e "Build Failed"
+exit 1
+else
+echo "Build Successful"
+fi
+
+sudo mysql<<EOF
+CREATE DATABASE IF NOT EXISTS $dbname;
+CREATE USER IF NOT EXISTS '$dbuser'@'localhost' IDENTIFIED BY '$dbpassword';
+GRANT ALL PRIVILEGES ON $dbname.* TO '$dbuser'@'localhost';
+FLUSH PRIVILEGES;
+exit
+EOF
+
+cd target
+nohup java -jar *.jar &
